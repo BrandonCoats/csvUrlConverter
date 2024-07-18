@@ -1,15 +1,21 @@
-import Papa from 'papaparse';
-import { saveAs } from 'file-saver';
+const fs = require('fs').promises;
+const Papa = require('papaparse');
+const path = require('path');
 
 // Function to read a CSV file
-function readCsvFile(file) {
-    return new Promise((resolve, reject) => {
-        Papa.parse(file, {
-            header: true,
-            complete: (results) => resolve(results.data),
-            error: (error) => reject(error),
+async function readCsvFile(filePath) {
+    try {
+        const data = await fs.readFile(filePath, 'utf8');
+        return new Promise((resolve, reject) => {
+            Papa.parse(data, {
+                header: true,
+                complete: (results) => resolve(results.data),
+                error: (error) => reject(error),
+            });
         });
-    });
+    } catch (error) {
+        throw new Error(`Failed to read file: ${error.message}`);
+    }
 }
 
 // Function to modify URLs in a CSV file
@@ -27,10 +33,13 @@ function convertToCsv(data) {
     return Papa.unparse(data);
 }
 
-// Function to trigger CSV download
-function downloadCsv(content, fileName) {
-    const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
-    saveAs(blob, fileName);
+// Function to write a CSV file
+async function writeCsvFile(filePath, content) {
+    try {
+        await fs.writeFile(filePath, content, 'utf8');
+    } catch (error) {
+        throw new Error(`Failed to write file: ${error.message}`);
+    }
 }
 
 // Example URL modification function
@@ -40,21 +49,20 @@ function modifyUrl(url) {
 }
 
 // Main function to handle file input and processing
-async function handleFileInput(file) {
+async function processCsvFile(inputFilePath, outputFilePath) {
     try {
-        const csvData = await readCsvFile(file);
+        const csvData = await readCsvFile(inputFilePath);
         const modifiedData = modifyUrlsInCsv(csvData, 'URL', modifyUrl);
         const newCsvContent = convertToCsv(modifiedData);
-        downloadCsv(newCsvContent, 'modified_urls.csv');
+        await writeCsvFile(outputFilePath, newCsvContent);
+        console.log(`File has been processed and saved to ${outputFilePath}`);
     } catch (error) {
         console.error('Error processing CSV file:', error);
     }
 }
 
-// Example usage: Suppose you have an input element of type file
-document.getElementById('csvFileInput').addEventListener('change', (event) => {
-    const file = event.target.files[0];
-    if (file) {
-        handleFileInput(file);
-    }
-});
+// Example usage
+const inputFilePath = path.join(__dirname, 'input.csv');
+const outputFilePath = path.join(__dirname, 'modified_urls.csv');
+
+processCsvFile(inputFilePath, outputFilePath);
